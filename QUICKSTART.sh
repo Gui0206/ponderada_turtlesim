@@ -59,4 +59,7 @@ echo ""
 read -p "Ready? (Enter) "
 
 echo "🚀 Launching ROS 2 Turtle Drawer..."
+echo ""
+echo "Make sure turtlesim is running in another terminal!"
+echo ""
 ros2 run turtle_draw_pkg turtle_drawer
