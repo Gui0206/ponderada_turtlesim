@@ -1,0 +1,34 @@
+# ROS 2 Build artifacts
+build/
+install/
+log/
+*.egg-info/
+dist/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Generated files
+*.png
+*.jpg
+*.jpeg
+!dog.png  # Keep the input image
+!vision_pipeline_visualization.png
+
+# ROS specific
+.ros/
