@@ -44,13 +44,21 @@ class TurtleDrawer(Node):
         processor.preprocess()
 
         # Extract contours with reasonable density
-        contours = processor.extract_contours(min_length=5)
+        contours = processor.extract_contours(min_length=10)
 
         if not contours:
             self.get_logger().error("No contours found in image!")
             return []
 
-        self.get_logger().info(f"Found {len(contours)} contours")
+        self.get_logger().info(f"Found {len(contours)} contours, filtering...")
+
+        # Keep only the largest contours (most important)
+        contours_by_size = sorted(contours, key=len, reverse=True)
+        # Use top 5-10 contours for cleaner drawing
+        max_contours = min(10, len(contours_by_size))
+        significant_contours = contours_by_size[:max_contours]
+
+        self.get_logger().info(f"Drawing top {len(significant_contours)} contours")
 
         # Map contours to turtle coordinate space
         mapper = CoordinateMapper(
@@ -59,9 +67,9 @@ class TurtleDrawer(Node):
         )
 
         mapped_contours = []
-        for contour in contours:
+        for contour in significant_contours:
             # Sample the contour to reduce points
-            skeleton = processor.get_contour_skeleton(contour, max_points=150)
+            skeleton = processor.get_contour_skeleton(contour, max_points=100)
             mapped = mapper.map_contour(skeleton)
             mapped_contours.append(mapped)
 
@@ -95,6 +103,10 @@ class TurtleDrawer(Node):
 
     def move_to_point(self, target_x: float, target_y: float):
         """Move turtle to a specific point."""
+        # Clamp coordinates to valid bounds
+        target_x = max(0.5, min(10.5, target_x))
+        target_y = max(0.5, min(10.5, target_y))
+
         # Calculate distance and angle
         dx = target_x - self.position_x
         dy = target_y - self.position_y
@@ -119,6 +131,10 @@ class TurtleDrawer(Node):
 
     def draw_line_to(self, target_x: float, target_y: float):
         """Draw a line to target point."""
+        # Clamp coordinates to valid bounds
+        target_x = max(0.5, min(10.5, target_x))
+        target_y = max(0.5, min(10.5, target_y))
+
         dx = target_x - self.position_x
         dy = target_y - self.position_y
         distance = math.sqrt(dx**2 + dy**2)
