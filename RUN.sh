@@ -1,16 +1,18 @@
-#!/bin/zsh
+#!/bin/bash
 
-# Simple runner that doesn't use interactive read (avoids zsh issues)
+# Runner for Turtle Draw
+# Sets up PATH and sources ROS environment properly
 
-source ~/.zshrc 2>/dev/null
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+WORKSPACE="$SCRIPT_DIR/turtle_draw_ws"
+ROS_ENV_PATH="${HOME}/.local/share/mamba/envs/ros_env"
 
-micromamba activate ros_env
+# Add ROS bin to PATH first
+export PATH="$ROS_ENV_PATH/bin:$PATH"
+export PYTHONPATH="$ROS_ENV_PATH/lib/python3.10/site-packages:$PYTHONPATH"
 
-cd "$(dirname "$0")" || exit 1
-WORKSPACE="$(pwd)/turtle_draw_ws"
+# Source the workspace setup
+source "$WORKSPACE/install/local_setup.bash" 2>/dev/null
 
-# Source the setup
-source "$WORKSPACE/install/setup.bash" 2>/dev/null
-
-# Run directly
+# Run turtle drawer
 ros2 run turtle_draw_pkg turtle_drawer
