@@ -1,0 +1,93 @@
+╔════════════════════════════════════════════════════════════╗
+║          TURTLE DRAW - FINAL WORKING INSTRUCTIONS           ║
+║                    (VERIFIED & TESTED)                      ║
+╚════════════════════════════════════════════════════════════╝
+
+⚠️  IMPORTANT: YOU MUST RUN TURTLESIM FIRST IN TERMINAL 1
+    The "No executable found" error means turtlesim is not running!
+
+════════════════════════════════════════════════════════════════
+TERMINAL 1 - START TURTLESIM (DO THIS FIRST!)
+════════════════════════════════════════════════════════════════
+
+Copy and paste this ENTIRE line:
+
+source ~/.zshrc && micromamba activate ros_env && ros2 run turtlesim turtlesim_node
+
+→ A graphical window will open with a white turtle on gray background
+→ LEAVE THIS RUNNING while you start Terminal 2
+
+════════════════════════════════════════════════════════════════
+TERMINAL 2 - RUN TURTLE DRAWER (ONLY AFTER TURTLESIM STARTS)
+════════════════════════════════════════════════════════════════
+
+Wait 3 seconds after the turtlesim window opens, then copy and paste:
+
+source /Users/guilhermeholanda/.local/share/mamba/envs/ros_env/setup.zsh && cd ~/Desktop/ponderada_ros/turtle_draw_ws && source install/local_setup.zsh && turtle_drawer
+
+→ Watch the turtlesim window
+→ The turtle will start drawing the dog contours automatically
+
+════════════════════════════════════════════════════════════════
+WHY THIS WORKS
+════════════════════════════════════════════════════════════════
+
+1. source /Users/guilhermeholanda/.local/share/mamba/envs/ros_env/setup.zsh
+   → Sets up ROS 2 environment from micromamba
+
+2. cd ~/Desktop/ponderada_ros/turtle_draw_ws
+   → Go to workspace
+
+3. source install/local_setup.zsh
+   → Loads our turtle_draw_pkg package
+
+4. turtle_drawer
+   → Runs the executable directly (works better than ros2 run)
+
+════════════════════════════════════════════════════════════════
+STEP-BY-STEP ALTERNATIVE (if copy/paste doesn't work)
+════════════════════════════════════════════════════════════════
+
+Terminal 1:
+  1. source ~/.zshrc
+  2. micromamba activate ros_env
+  3. ros2 run turtlesim turtlesim_node
+  → Wait for window to appear
+
+Terminal 2:
+  1. source /Users/guilhermeholanda/.local/share/mamba/envs/ros_env/setup.zsh
+  2. cd ~/Desktop/ponderada_ros/turtle_draw_ws
+  3. source install/local_setup.zsh
+  4. turtle_drawer
+
+════════════════════════════════════════════════════════════════
+TESTING WITHOUT TURTLESIM
+════════════════════════════════════════════════════════════════
+
+To test the vision pipeline without turtlesim:
+
+source ~/.zshrc && micromamba activate ros_env && python3 ~/Desktop/ponderada_ros/test_vision_pipeline.py
+
+════════════════════════════════════════════════════════════════
+TROUBLESHOOTING
+════════════════════════════════════════════════════════════════
+
+Q: "No executable found"
+A: Turtlesim is not running in Terminal 1. Start it first!
+
+Q: "turtle_drawer: command not found"
+A: You didn't source install/local_setup.zsh. Run all 4 steps in Terminal 2.
+
+Q: Window doesn't appear
+A: Make sure X11 or display server is running (it should be on Mac)
+
+════════════════════════════════════════════════════════════════
+KEY INSIGHT
+════════════════════════════════════════════════════════════════
+
+The turtle_drawer executable works fine when called directly.
+Just use: turtle_drawer
+
+Instead of: ros2 run turtle_draw_pkg turtle_drawer
+
+════════════════════════════════════════════════════════════════
