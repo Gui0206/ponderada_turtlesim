@@ -28,7 +28,7 @@ Copy and paste these commands ONE BY ONE:
 
 3. cd ~/Desktop/ponderada_ros/turtle_draw_ws
 
-4. source install/setup.bash
+4. source install/local_setup.zsh
 
 5. ros2 run turtle_draw_pkg turtle_drawer
 
@@ -65,6 +65,6 @@ Terminal 1:
 source ~/.zshrc && micromamba activate ros_env && ros2 run turtlesim turtlesim_node
 
 Terminal 2:
-source ~/.zshrc && micromamba activate ros_env && cd ~/Desktop/ponderada_ros/turtle_draw_ws && source install/setup.bash && ros2 run turtle_draw_pkg turtle_drawer
+source ~/.zshrc && micromamba activate ros_env && cd ~/Desktop/ponderada_ros/turtle_draw_ws && source install/local_setup.zsh && ros2 run turtle_draw_pkg turtle_drawer
 
 ═══════════════════════════════════════════════════════
