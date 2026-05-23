@@ -2,175 +2,158 @@
 
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Twist
-from turtlesim.msg import Pose
-import math
-import time
+from turtlesim.srv import TeleportAbsolute, SetPen
+import numpy as np
 import argparse
-import sys
+import time
 
 from .image_processor import ImageProcessor
-from .contour_extractor import ContourExtractor
-from .path_planner import PathPlanner
 
 
 class TurtleDrawer(Node):
-    """ROS 2 node that draws image contours using turtlesim."""
+    """ROS 2 node that draws image contours using turtlesim with teleportation."""
 
     def __init__(self, image_path: str = None):
         super().__init__('turtle_drawer')
 
         self.image_path = image_path
-        self.pub = self.create_publisher(Twist, '/turtle1/cmd_vel', 10)
-        self.sub_pose = self.create_subscription(Pose, '/turtle1/pose', self.pose_callback, 10)
 
-        self.current_pose = None
-        self.drawing_complete = False
+        # Create service clients
+        self.teleport_client = self.create_client(TeleportAbsolute, '/turtle1/teleport_absolute')
+        self.pen_client = self.create_client(SetPen, '/turtle1/set_pen')
 
-        # Parameters
-        self.linear_speed = 2.0  # units/sec
-        self.angular_speed = 1.0  # radians/sec
-        self.position_tolerance = 0.05
-        self.angle_tolerance = 0.01
+        # Wait for services
+        while not self.teleport_client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('Waiting for /turtle1/teleport_absolute service...')
 
-        self.get_logger().info(f'TurtleDrawer initialized. Image: {image_path}')
+        while not self.pen_client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('Waiting for /turtle1/set_pen service...')
 
-    def pose_callback(self, msg: Pose):
-        """Callback to receive turtle's current pose."""
-        self.current_pose = msg
+        self.get_logger().info('Services ready! Starting to draw...')
 
-    def process_image_and_draw(self):
-        """Main pipeline: process image and draw contours."""
+    def extract_points_from_binary_image(self, binary_image: np.ndarray) -> list:
+        """Extract all white pixels from binary image and map to turtle space."""
+        height, width = binary_image.shape
+
+        # Find all white pixels
+        y_indices, x_indices = np.where(binary_image == 255)
+
+        if len(x_indices) == 0:
+            self.get_logger().warn('No white pixels found in image')
+            return []
+
+        # Map to turtle space with margins
+        points = []
+        margin = 0.5
+        turtle_bounds = 11.0
+        available_space = turtle_bounds - (2 * margin)
+
+        min_x, max_x = np.min(x_indices), np.max(x_indices)
+        min_y, max_y = np.min(y_indices), np.max(y_indices)
+
+        # Calculate scale to fit in turtle space
+        largest_dim = max(max_x - min_x, max_y - min_y)
+        scale = available_space / (largest_dim + 1)
+
+        for x, y in zip(x_indices, y_indices):
+            # Map to turtle coordinates
+            turtle_x = margin + (x - min_x) * scale
+            turtle_y = margin + (max_y - y) * scale
+            points.append((turtle_x, turtle_y))
+
+        self.get_logger().info(f'Extracted {len(points)} points from image')
+        return points
+
+    def teleport_turtle(self, x: float, y: float, theta: float = 0.0):
+        """Teleport turtle to position."""
+        request = TeleportAbsolute.Request()
+        request.x = x
+        request.y = y
+        request.theta = theta
+
+        future = self.teleport_client.call_async(request)
+        rclpy.spin_until_future_complete(self, future)
+
+    def set_pen(self, r: int = 0, g: int = 0, b: int = 0, width: int = 1, off: int = 0):
+        """Set pen properties (color, width, on/off)."""
+        request = SetPen.Request()
+        request.r = r
+        request.g = g
+        request.b = b
+        request.width = width
+        request.off = off
+
+        future = self.pen_client.call_async(request)
+        rclpy.spin_until_future_complete(self, future)
+
+    def draw_image(self):
+        """Main drawing function."""
         if self.image_path is None:
             self.get_logger().error('Image path not set')
             return False
 
         try:
-            # Step 1: Load and preprocess image
-            self.get_logger().info('Loading image...')
+            # Load image
+            self.get_logger().info(f'Loading image: {self.image_path}')
             image = ImageProcessor.load_image(self.image_path)
-
             self.get_logger().info(f'Image shape: {image.shape}')
 
-            # Step 2: Preprocess
+            # Preprocess
             self.get_logger().info('Preprocessing image...')
             binary = ImageProcessor.preprocess(image)
 
-            # Step 3: Extract contours
-            self.get_logger().info('Extracting contours...')
-            contours = ContourExtractor.find_contours(binary)
-            self.get_logger().info(f'Found {len(contours)} contours')
+            # Extract points
+            self.get_logger().info('Extracting points...')
+            points = self.extract_points_from_binary_image(binary)
 
-            # Filter and process contours
-            contours = ContourExtractor.filter_contours_by_size(contours, min_size=10)
-            self.get_logger().info(f'After filtering: {len(contours)} contours')
-
-            if len(contours) == 0:
-                self.get_logger().warn('No contours found in image')
+            if len(points) == 0:
+                self.get_logger().warn('No points to draw')
                 return False
 
-            # Simplify contours
-            simplified_contours = []
-            for contour in contours:
-                simplified = ContourExtractor.simplify_contour(contour, epsilon=3.0)
-                if len(simplified) > 5:
-                    simplified_contours.append(simplified)
+            # Draw
+            self.get_logger().info(f'Starting to draw {len(points)} points...')
+            time.sleep(1.0)
 
-            self.get_logger().info(f'After simplification: {len(simplified_contours)} contours')
+            # Lift pen and move to first point
+            self.set_pen(off=1)
+            self.teleport_turtle(points[0][0], points[0][1])
+            self.set_pen(off=0)
 
-            # Step 4: Plan paths
-            self.get_logger().info('Planning paths...')
-            planner = PathPlanner(image.shape)
-            paths = planner.contours_to_paths(simplified_contours)
+            # Draw all points
+            jump_threshold = 0.3  # Distance threshold for jumping (lifting pen)
 
-            self.get_logger().info(f'Planned {len(paths)} paths')
+            for i, (x, y) in enumerate(points):
+                if i > 0:
+                    # Check distance to previous point
+                    prev_x, prev_y = points[i - 1]
+                    distance = np.sqrt((x - prev_x)**2 + (y - prev_y)**2)
 
-            # Step 5: Draw paths
-            self.get_logger().info('Starting to draw...')
-            time.sleep(2.0)  # Give turtle time to settle
+                    if distance > jump_threshold:
+                        # Jump: lift pen, teleport, lower pen
+                        self.set_pen(off=1)
+                        self.teleport_turtle(x, y)
+                        self.set_pen(off=0)
+                    else:
+                        # Continue drawing
+                        self.teleport_turtle(x, y)
 
-            for path_idx, path in enumerate(paths):
-                self.get_logger().info(f'Drawing path {path_idx + 1}/{len(paths)} ({len(path)} points)')
-
-                # Move to start of path
-                if len(path) > 0:
-                    self.move_to(path[0][0], path[0][1])
-
-                # Draw the path
-                for i in range(1, len(path)):
-                    target_x, target_y = path[i]
-                    self.move_to(target_x, target_y)
-
-                # Small pause between contours
-                time.sleep(0.5)
+                if (i + 1) % 100 == 0:
+                    self.get_logger().info(f'Drawn {i + 1}/{len(points)} points')
 
             self.get_logger().info('Drawing complete!')
-            self.drawing_complete = True
             return True
 
         except Exception as e:
-            self.get_logger().error(f'Error processing image: {str(e)}')
+            self.get_logger().error(f'Error: {str(e)}')
             import traceback
             traceback.print_exc()
             return False
-
-    def move_to(self, target_x: float, target_y: float, timeout: float = 10.0):
-        """Move turtle to target position."""
-        start_time = time.time()
-
-        while time.time() - start_time < timeout:
-            if self.current_pose is None:
-                self.get_logger().warn('Waiting for pose data...')
-                time.sleep(0.1)
-                continue
-
-            # Calculate distance and angle to target
-            dx = target_x - self.current_pose.x
-            dy = target_y - self.current_pose.y
-            distance = math.sqrt(dx**2 + dy**2)
-
-            if distance < self.position_tolerance:
-                # Reached target
-                self.stop()
-                return True
-
-            target_angle = math.atan2(dy, dx)
-            angle_diff = target_angle - self.current_pose.theta
-
-            # Normalize angle to [-pi, pi]
-            while angle_diff > math.pi:
-                angle_diff -= 2 * math.pi
-            while angle_diff < -math.pi:
-                angle_diff += 2 * math.pi
-
-            # Create velocity command
-            cmd = Twist()
-
-            # If angle difference is large, rotate first
-            if abs(angle_diff) > self.angle_tolerance:
-                cmd.angular.z = self.angular_speed if angle_diff > 0 else -self.angular_speed
-                cmd.linear.x = 0.0
-            else:
-                cmd.linear.x = min(self.linear_speed, distance)
-                cmd.angular.z = 0.0
-
-            self.pub.publish(cmd)
-            time.sleep(0.05)
-
-        self.get_logger().warn(f'Timeout moving to ({target_x}, {target_y})')
-        self.stop()
-        return False
-
-    def stop(self):
-        """Stop turtle movement."""
-        cmd = Twist()
-        self.pub.publish(cmd)
 
 
 def main(args=None):
     rclpy.init(args=args)
 
-    parser = argparse.ArgumentParser(description='Turtle Draw - Draw image contours using turtlesim')
+    parser = argparse.ArgumentParser(description='Turtle Draw - Draw image with turtlesim')
     parser.add_argument('image', nargs='?', help='Path to image file')
     args = parser.parse_args(args)
 
@@ -182,9 +165,8 @@ def main(args=None):
     node = TurtleDrawer(image_path=args.image)
 
     try:
-        node.process_image_and_draw()
+        node.draw_image()
     finally:
-        node.stop()
         rclpy.shutdown()
 
 
