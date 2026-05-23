@@ -2,9 +2,6 @@
 
 Uma pipeline completa de visão computacional implementada do zero para extrair contornos de imagens e controlar a tartaruga do turtlesim para reproduzi-los.
 
-## 🎬 Vídeo Demonstração
-
-[Inserir vídeo aqui - até 4 minutos explicando o desenvolvimento e demonstração]
 
 ---
 
