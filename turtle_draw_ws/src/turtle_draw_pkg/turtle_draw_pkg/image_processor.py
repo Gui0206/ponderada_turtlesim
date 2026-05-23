@@ -5,8 +5,8 @@ from typing import Tuple
 
 class ImageProcessor:
     """
-    Computer vision pipeline for edge detection and preprocessing.
-    Implements all algorithms from scratch using NumPy only.
+    Pipeline de visão computacional para detecção de bordas e pré-processamento.
+    Todos os algoritmos implementados do zero usando apenas NumPy.
     """
 
     def __init__(self):
@@ -14,28 +14,28 @@ class ImageProcessor:
 
     @staticmethod
     def load_image(image_path: str) -> np.ndarray:
-        """Load image using OpenCV (only allowed use of OpenCV)."""
+        """Carrega imagem usando OpenCV (único uso permitido de OpenCV)."""
         img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
         if img is None:
-            raise ValueError(f"Could not load image from {image_path}")
+            raise ValueError(f"Não foi possível carregar imagem de {image_path}")
         return img
 
     @staticmethod
     def gaussian_blur(image: np.ndarray, kernel_size: int = 5, sigma: float = 1.0) -> np.ndarray:
         """
-        Apply Gaussian blur using separable convolution (from scratch).
-        Kernel size must be odd.
+        Aplica desfoque Gaussiano usando convolução separável (do zero).
+        Tamanho do kernel deve ser ímpar.
         """
         if kernel_size % 2 == 0:
             kernel_size += 1
 
-        # Create 1D Gaussian kernel
+        # Cria kernel Gaussiano 1D
         kernel = ImageProcessor._create_gaussian_kernel(kernel_size, sigma)
 
-        # Normalize kernel
+        # Normaliza kernel
         kernel = kernel / np.sum(kernel)
 
-        # Apply separable convolution (apply 1D twice - horizontal then vertical)
+        # Aplica convolução separável (aplica 1D duas vezes - horizontal depois vertical)
         blurred = ImageProcessor._convolve_1d(image, kernel, axis=1)
         blurred = ImageProcessor._convolve_1d(blurred, kernel, axis=0)
 
@@ -43,14 +43,14 @@ class ImageProcessor:
 
     @staticmethod
     def _create_gaussian_kernel(size: int, sigma: float) -> np.ndarray:
-        """Create 1D Gaussian kernel."""
+        """Cria kernel Gaussiano 1D."""
         kernel = np.arange(size) - (size - 1) / 2.0
         kernel = np.exp(-0.5 * (kernel / sigma) ** 2)
         return kernel
 
     @staticmethod
     def _convolve_1d(image: np.ndarray, kernel: np.ndarray, axis: int = 0) -> np.ndarray:
-        """Apply 1D convolution along specified axis with padding."""
+        """Aplica convolução 1D ao longo do eixo especificado com padding."""
         kernel_size = len(kernel)
         pad_size = kernel_size // 2
 
@@ -74,18 +74,18 @@ class ImageProcessor:
     @staticmethod
     def sobel_edge_detection(image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Sobel edge detection from scratch.
-        Returns magnitude and direction of edges.
+        Detecção de bordas com Sobel do zero.
+        Retorna magnitude e direção das bordas.
         """
-        # Sobel kernels
+        # Kernels de Sobel
         sobel_x = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=np.float32)
         sobel_y = np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], dtype=np.float32)
 
-        # Apply convolution
+        # Aplica convolução
         gx = ImageProcessor._convolve_2d(image, sobel_x)
         gy = ImageProcessor._convolve_2d(image, sobel_y)
 
-        # Calculate magnitude and direction
+        # Calcula magnitude e direção
         magnitude = np.sqrt(gx**2 + gy**2)
         direction = np.arctan2(gy, gx)
 
@@ -93,7 +93,7 @@ class ImageProcessor:
 
     @staticmethod
     def _convolve_2d(image: np.ndarray, kernel: np.ndarray) -> np.ndarray:
-        """Apply 2D convolution with reflection padding."""
+        """Aplica convolução 2D com padding por reflexão."""
         kernel_h, kernel_w = kernel.shape
         pad_h = kernel_h // 2
         pad_w = kernel_w // 2
@@ -111,13 +111,13 @@ class ImageProcessor:
     @staticmethod
     def non_maximum_suppression(magnitude: np.ndarray, direction: np.ndarray) -> np.ndarray:
         """
-        Non-maximum suppression for Canny-like edge thinning.
-        Suppresses pixels that are not local maxima in gradient direction.
+        Supressão de não-máximos para afinamento de bordas tipo Canny.
+        Suprime pixels que não são máximos locais na direção do gradiente.
         """
         h, w = magnitude.shape
         suppressed = np.zeros_like(magnitude)
 
-        # Convert direction to degrees
+        # Converte direção para graus
         direction = np.degrees(direction) + 180
         direction[direction < 0] += 180
 
@@ -126,7 +126,7 @@ class ImageProcessor:
                 angle = direction[i, j]
                 current_magnitude = magnitude[i, j]
 
-                # Determine neighbors based on edge direction
+                # Determina vizinhos baseado na direção da borda
                 if (0 <= angle < 22.5) or (157.5 <= angle <= 180):
                     # Horizontal
                     neighbor1 = magnitude[i, j + 1]
@@ -151,27 +151,27 @@ class ImageProcessor:
 
     @staticmethod
     def threshold(image: np.ndarray, threshold_value: float) -> np.ndarray:
-        """Simple binary thresholding."""
+        """Thresholding binário simples."""
         return (image > threshold_value).astype(np.uint8) * 255
 
     @staticmethod
     def preprocess(image: np.ndarray) -> np.ndarray:
         """
-        Preprocess image: normalize, blur, and edge detect.
+        Pré-processamento de imagem: normalização, desfoque e detecção de bordas.
         """
-        # Normalize to 0-1 range
+        # Normaliza para intervalo 0-1
         normalized = image.astype(np.float32) / 255.0
 
-        # Apply Gaussian blur to reduce noise
+        # Aplica desfoque Gaussiano para reduzir ruído
         blurred = ImageProcessor.gaussian_blur(normalized, kernel_size=5, sigma=1.5)
 
-        # Sobel edge detection
+        # Detecção de bordas com Sobel
         magnitude, direction = ImageProcessor.sobel_edge_detection(blurred)
 
-        # Non-maximum suppression
+        # Supressão de não-máximos
         suppressed = ImageProcessor.non_maximum_suppression(magnitude, direction)
 
-        # Threshold to binary
+        # Thresholding para binária
         normalized_mag = suppressed / (np.max(suppressed) + 1e-8)
         binary = ImageProcessor.threshold(normalized_mag, threshold_value=0.1)
 
@@ -180,8 +180,8 @@ class ImageProcessor:
     @staticmethod
     def dilate(image: np.ndarray, kernel_size: int = 3, iterations: int = 1) -> np.ndarray:
         """
-        Morphological dilation (from scratch).
-        Expands white regions.
+        Dilatação morfológica (do zero).
+        Expande regiões brancas.
         """
         kernel = np.ones((kernel_size, kernel_size), dtype=np.uint8)
 
@@ -201,8 +201,8 @@ class ImageProcessor:
     @staticmethod
     def erode(image: np.ndarray, kernel_size: int = 3, iterations: int = 1) -> np.ndarray:
         """
-        Morphological erosion (from scratch).
-        Shrinks white regions.
+        Erosão morfológica (do zero).
+        Encolhe regiões brancas.
         """
         kernel = np.ones((kernel_size, kernel_size), dtype=np.uint8)
 
