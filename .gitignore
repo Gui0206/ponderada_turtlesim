@@ -1,34 +1,37 @@
-# ROS 2 Build artifacts
-build/
-install/
-log/
-*.egg-info/
-dist/
+# Build artifacts
+turtle_draw_ws/build/
+turtle_draw_ws/install/
+turtle_draw_ws/log/
 
-# Python
+# Python cache
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-env/
-venv/
-.venv
+*.egg-info/
+dist/
+build/
 
-# IDEs
+# ROS specific
+.colcon/
+
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+
+# OS
 .DS_Store
+Thumbs.db
 
-# Generated files
-*.png
-*.jpg
-*.jpeg
-!dog.png  # Keep the input image
-!vision_pipeline_visualization.png
+# Temporary files
+*.tmp
+*.bak
+*.log
 
-# ROS specific
-.ros/
+# Generated images (keep source)
+# pipeline_visualization.png
+# turtle_paths.png

@@ -1,208 +1,190 @@
-"""
-ROS 2 node that draws image contours using the turtle.
-Simple, fast, and respects turtlesim bounds properly.
-"""
+#!/usr/bin/env python3
 
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
-import time
+from turtlesim.msg import Pose
 import math
-import numpy as np
-from turtle_draw_pkg.vision_pipeline import ImageProcessor, CoordinateMapper
+import time
+import argparse
+import sys
+
+from .image_processor import ImageProcessor
+from .contour_extractor import ContourExtractor
+from .path_planner import PathPlanner
 
 
 class TurtleDrawer(Node):
-    """ROS 2 node for controlling turtle to draw image contours."""
+    """ROS 2 node that draws image contours using turtlesim."""
 
     def __init__(self, image_path: str = None):
         super().__init__('turtle_drawer')
 
-        self.velocity_publisher = self.create_publisher(Twist, '/turtle1/cmd_vel', 10)
-        self.image_path = image_path or '/Users/guilhermeholanda/Desktop/ponderada_ros/dog.png'
+        self.image_path = image_path
+        self.pub = self.create_publisher(Twist, '/turtle1/cmd_vel', 10)
+        self.sub_pose = self.create_subscription(Pose, '/turtle1/pose', self.pose_callback, 10)
 
-        # Turtle state (start at center of turtlesim 11x11 space)
-        self.position_x = 5.5
-        self.position_y = 5.5
-        self.heading = 0.0  # Radians, 0 = facing right
+        self.current_pose = None
+        self.drawing_complete = False
 
-        # FAST turtle speeds
-        self.linear_speed = 2.0  # m/s - much faster
-        self.angular_speed = 2.0  # rad/s - much faster
+        # Parameters
+        self.linear_speed = 2.0  # units/sec
+        self.angular_speed = 1.0  # radians/sec
+        self.position_tolerance = 0.05
+        self.angle_tolerance = 0.01
 
-        # Turtlesim bounds: 0.0 to 11.0
-        self.x_min, self.x_max = 0.0, 11.0
-        self.y_min, self.y_max = 0.0, 11.0
+        self.get_logger().info(f'TurtleDrawer initialized. Image: {image_path}')
 
-        self.get_logger().info(f"Turtle Drawer initialized")
-        self.get_logger().info(f"Bounds: X=[{self.x_min}, {self.x_max}], Y=[{self.y_min}, {self.y_max}]")
+    def pose_callback(self, msg: Pose):
+        """Callback to receive turtle's current pose."""
+        self.current_pose = msg
 
-    def process_image(self):
-        """Process image to extract the main contour."""
-        self.get_logger().info("Processing image...")
+    def process_image_and_draw(self):
+        """Main pipeline: process image and draw contours."""
+        if self.image_path is None:
+            self.get_logger().error('Image path not set')
+            return False
 
-        processor = ImageProcessor()
-        processor.load_image(self.image_path)
-        processor.to_grayscale()
-        processor.preprocess()
+        try:
+            # Step 1: Load and preprocess image
+            self.get_logger().info('Loading image...')
+            image = ImageProcessor.load_image(self.image_path)
 
-        # Extract contours
-        all_contours = processor.extract_contours(min_length=20)
+            self.get_logger().info(f'Image shape: {image.shape}')
 
-        if not all_contours:
-            self.get_logger().error("No contours found!")
-            return []
+            # Step 2: Preprocess
+            self.get_logger().info('Preprocessing image...')
+            binary = ImageProcessor.preprocess(image)
 
-        # Get ONLY the largest contour (main dog shape)
-        largest = max(all_contours, key=len)
-        self.get_logger().info(f"Using largest contour: {len(largest)} points")
+            # Step 3: Extract contours
+            self.get_logger().info('Extracting contours...')
+            contours = ContourExtractor.find_contours(binary)
+            self.get_logger().info(f'Found {len(contours)} contours')
 
-        # Map to turtle space
-        mapper = CoordinateMapper(
-            processor.original.shape,
-            (self.x_min, self.x_max, self.y_min, self.y_max)
-        )
+            # Filter and process contours
+            contours = ContourExtractor.filter_contours_by_size(contours, min_size=10)
+            self.get_logger().info(f'After filtering: {len(contours)} contours')
 
-        # Sample points for smooth drawing
-        skeleton = processor.get_contour_skeleton(largest, max_points=80)
-        mapped = mapper.map_contour(skeleton)
+            if len(contours) == 0:
+                self.get_logger().warn('No contours found in image')
+                return False
 
-        self.get_logger().info(f"Mapped to {len(mapped)} drawing points")
-        return [mapped]
+            # Simplify contours
+            simplified_contours = []
+            for contour in contours:
+                simplified = ContourExtractor.simplify_contour(contour, epsilon=3.0)
+                if len(simplified) > 5:
+                    simplified_contours.append(simplified)
 
-    def draw_contours(self, contours: list):
-        """Draw contours efficiently."""
-        if not contours:
-            self.get_logger().warn("No contours to draw")
-            return
+            self.get_logger().info(f'After simplification: {len(simplified_contours)} contours')
 
-        for contour_idx, contour in enumerate(contours):
-            self.get_logger().info(f"Drawing contour {contour_idx + 1}")
+            # Step 4: Plan paths
+            self.get_logger().info('Planning paths...')
+            planner = PathPlanner(image.shape)
+            paths = planner.contours_to_paths(simplified_contours)
 
-            if len(contour) < 2:
+            self.get_logger().info(f'Planned {len(paths)} paths')
+
+            # Step 5: Draw paths
+            self.get_logger().info('Starting to draw...')
+            time.sleep(2.0)  # Give turtle time to settle
+
+            for path_idx, path in enumerate(paths):
+                self.get_logger().info(f'Drawing path {path_idx + 1}/{len(paths)} ({len(path)} points)')
+
+                # Move to start of path
+                if len(path) > 0:
+                    self.move_to(path[0][0], path[0][1])
+
+                # Draw the path
+                for i in range(1, len(path)):
+                    target_x, target_y = path[i]
+                    self.move_to(target_x, target_y)
+
+                # Small pause between contours
+                time.sleep(0.5)
+
+            self.get_logger().info('Drawing complete!')
+            self.drawing_complete = True
+            return True
+
+        except Exception as e:
+            self.get_logger().error(f'Error processing image: {str(e)}')
+            import traceback
+            traceback.print_exc()
+            return False
+
+    def move_to(self, target_x: float, target_y: float, timeout: float = 10.0):
+        """Move turtle to target position."""
+        start_time = time.time()
+
+        while time.time() - start_time < timeout:
+            if self.current_pose is None:
+                self.get_logger().warn('Waiting for pose data...')
+                time.sleep(0.1)
                 continue
 
-            # Move to start (pen up)
-            first_point = contour[0]
-            self._move_direct(first_point[0], first_point[1])
+            # Calculate distance and angle to target
+            dx = target_x - self.current_pose.x
+            dy = target_y - self.current_pose.y
+            distance = math.sqrt(dx**2 + dy**2)
 
-            # Draw rest (pen down - turtle draws as it moves)
-            for point in contour[1:]:
-                self._draw_direct(point[0], point[1])
+            if distance < self.position_tolerance:
+                # Reached target
+                self.stop()
+                return True
 
-        self.get_logger().info("Drawing complete!")
+            target_angle = math.atan2(dy, dx)
+            angle_diff = target_angle - self.current_pose.theta
 
-    def _clamp(self, value: float, min_val: float, max_val: float) -> float:
-        """Clamp value to range."""
-        return max(min_val, min(max_val, value))
+            # Normalize angle to [-pi, pi]
+            while angle_diff > math.pi:
+                angle_diff -= 2 * math.pi
+            while angle_diff < -math.pi:
+                angle_diff += 2 * math.pi
 
-    def _move_direct(self, target_x: float, target_y: float):
-        """Move directly to point (fast)."""
-        # Ensure coordinates are within bounds
-        target_x = self._clamp(target_x, self.x_min, self.x_max)
-        target_y = self._clamp(target_y, self.y_min, self.y_max)
+            # Create velocity command
+            cmd = Twist()
 
-        # Simple direct movement
-        self._go_to(target_x, target_y)
+            # If angle difference is large, rotate first
+            if abs(angle_diff) > self.angle_tolerance:
+                cmd.angular.z = self.angular_speed if angle_diff > 0 else -self.angular_speed
+                cmd.linear.x = 0.0
+            else:
+                cmd.linear.x = min(self.linear_speed, distance)
+                cmd.angular.z = 0.0
 
-    def _draw_direct(self, target_x: float, target_y: float):
-        """Draw line to point (fast)."""
-        # Ensure coordinates are within bounds
-        target_x = self._clamp(target_x, self.x_min, self.x_max)
-        target_y = self._clamp(target_y, self.y_min, self.y_max)
+            self.pub.publish(cmd)
+            time.sleep(0.05)
 
-        # Same as move (turtle draws as it moves)
-        self._go_to(target_x, target_y)
+        self.get_logger().warn(f'Timeout moving to ({target_x}, {target_y})')
+        self.stop()
+        return False
 
-    def _go_to(self, target_x: float, target_y: float):
-        """Go to target position."""
-        dx = target_x - self.position_x
-        dy = target_y - self.position_y
-        distance = math.sqrt(dx**2 + dy**2)
-
-        if distance < 0.01:  # Already there
-            return
-
-        # Calculate target angle
-        target_angle = math.atan2(dy, dx)
-        angle_diff = self._normalize_angle(target_angle - self.heading)
-
-        # Rotate if needed
-        if abs(angle_diff) > 0.05:
-            self._rotate_fast(angle_diff)
-
-        # Move forward
-        self._move_fast(distance)
-
-        # Update state
-        self.position_x = target_x
-        self.position_y = target_y
-        self.heading = target_angle
-
-    def _move_fast(self, distance: float):
-        """Move forward FAST."""
-        if distance < 0.01:
-            return
-
-        twist = Twist()
-        twist.linear.x = self.linear_speed if distance > 0 else -self.linear_speed
-        distance = abs(distance)
-
-        time_needed = distance / self.linear_speed
-        end_time = time.time() + time_needed
-
-        while time.time() < end_time:
-            self.velocity_publisher.publish(twist)
-            time.sleep(0.005)  # 5ms updates instead of 10ms
-
-        twist.linear.x = 0.0
-        self.velocity_publisher.publish(twist)
-        time.sleep(0.01)
-
-    def _rotate_fast(self, angle: float):
-        """Rotate FAST."""
-        if abs(angle) < 0.01:
-            return
-
-        twist = Twist()
-        twist.angular.z = self.angular_speed if angle > 0 else -self.angular_speed
-        angle = abs(angle)
-
-        time_needed = angle / self.angular_speed
-        end_time = time.time() + time_needed
-
-        while time.time() < end_time:
-            self.velocity_publisher.publish(twist)
-            time.sleep(0.005)
-
-        twist.angular.z = 0.0
-        self.velocity_publisher.publish(twist)
-        time.sleep(0.01)
-
-    def _normalize_angle(self, angle: float) -> float:
-        """Normalize angle to [-pi, pi]."""
-        while angle > math.pi:
-            angle -= 2 * math.pi
-        while angle < -math.pi:
-            angle += 2 * math.pi
-        return angle
+    def stop(self):
+        """Stop turtle movement."""
+        cmd = Twist()
+        self.pub.publish(cmd)
 
 
 def main(args=None):
-    """Main ROS 2 entry point."""
     rclpy.init(args=args)
 
-    drawer = TurtleDrawer()
+    parser = argparse.ArgumentParser(description='Turtle Draw - Draw image contours using turtlesim')
+    parser.add_argument('image', nargs='?', help='Path to image file')
+    args = parser.parse_args(args)
+
+    if args.image is None:
+        print('Usage: turtle_drawer <image_path>')
+        print('Example: turtle_drawer /path/to/image.png')
+        return
+
+    node = TurtleDrawer(image_path=args.image)
 
     try:
-        contours = drawer.process_image()
-        drawer.draw_contours(contours)
-    except Exception as e:
-        drawer.get_logger().error(f"Error: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        node.process_image_and_draw()
     finally:
-        drawer.destroy_node()
+        node.stop()
         rclpy.shutdown()
 
 

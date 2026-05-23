@@ -1,239 +1,164 @@
-"""
-Computer vision pipeline for extracting image contours.
-All image processing implemented from scratch using only NumPy.
-"""
+#!/usr/bin/env python3
 
-import cv2
 import numpy as np
-from typing import Tuple, List
+import matplotlib.pyplot as plt
+import argparse
+import sys
+
+from .image_processor import ImageProcessor
+from .contour_extractor import ContourExtractor
+from .path_planner import PathPlanner
 
 
-class ImageProcessor:
-    """Handles all image preprocessing and edge detection."""
+def visualize_pipeline(image_path: str, output_dir: str = None):
+    """
+    Visualize each step of the computer vision pipeline.
+    Saves images showing preprocessing, edge detection, contours, etc.
+    """
+    print(f'Loading image from: {image_path}')
 
-    def __init__(self):
-        self.original = None
-        self.grayscale = None
-        self.preprocessed = None
-        self.edges = None
-        self.contours = None
+    # Load image
+    image = ImageProcessor.load_image(image_path)
+    print(f'Original image shape: {image.shape}')
 
-    def load_image(self, image_path: str) -> np.ndarray:
-        """Load image using OpenCV (allowed by requirements)."""
-        self.original = cv2.imread(image_path)
-        if self.original is None:
-            raise ValueError(f"Could not load image from {image_path}")
-        return self.original
+    # Normalize
+    normalized = image.astype(np.float32) / 255.0
 
-    def to_grayscale(self, image: np.ndarray = None) -> np.ndarray:
-        """Convert BGR to grayscale using standard luminosity formula."""
-        if image is None:
-            image = self.original
+    # Gaussian blur
+    print('Applying Gaussian blur...')
+    blurred = ImageProcessor.gaussian_blur(normalized, kernel_size=5, sigma=1.5)
 
-        # Standard RGB to grayscale: 0.299*R + 0.587*G + 0.114*B
-        # OpenCV uses BGR, so: 0.299*B + 0.587*G + 0.114*R
-        b, g, r = image[:, :, 0], image[:, :, 1], image[:, :, 2]
-        self.grayscale = (0.114 * r + 0.587 * g + 0.299 * b).astype(np.uint8)
-        return self.grayscale
+    # Sobel edge detection
+    print('Detecting edges with Sobel...')
+    magnitude, direction = ImageProcessor.sobel_edge_detection(blurred)
+    magnitude_normalized = magnitude / (np.max(magnitude) + 1e-8)
 
-    def gaussian_blur(self, image: np.ndarray = None, kernel_size: int = 5, sigma: float = 1.0) -> np.ndarray:
-        """Apply Gaussian blur using separable convolution (from scratch)."""
-        if image is None:
-            image = self.grayscale
+    # Non-maximum suppression
+    print('Applying non-maximum suppression...')
+    suppressed = ImageProcessor.non_maximum_suppression(magnitude, direction)
+    suppressed_normalized = suppressed / (np.max(suppressed) + 1e-8)
 
-        # Create 1D Gaussian kernel
-        kernel_1d = self._gaussian_kernel_1d(kernel_size, sigma)
+    # Thresholding
+    print('Thresholding...')
+    threshold = 0.1
+    binary = ImageProcessor.threshold(suppressed_normalized, threshold_value=threshold)
 
-        # Apply horizontal convolution
-        blurred_h = self._convolve_1d(image, kernel_1d, axis=1)
+    # Extract contours
+    print('Extracting contours...')
+    contours = ContourExtractor.find_contours(binary)
+    print(f'Found {len(contours)} contours')
 
-        # Apply vertical convolution
-        blurred = self._convolve_1d(blurred_h, kernel_1d, axis=0)
+    # Filter contours
+    filtered_contours = ContourExtractor.filter_contours_by_size(contours, min_size=10)
+    print(f'After filtering: {len(filtered_contours)} contours')
 
-        return blurred.astype(np.uint8)
+    # Visualize
+    fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+    fig.suptitle('Computer Vision Pipeline - Turtle Draw', fontsize=16)
 
-    def _gaussian_kernel_1d(self, size: int, sigma: float) -> np.ndarray:
-        """Create 1D Gaussian kernel."""
-        kernel = np.zeros(size)
-        center = size // 2
-        for x in range(size):
-            kernel[x] = np.exp(-((x - center) ** 2) / (2 * sigma ** 2))
-        kernel /= np.sum(kernel)
-        return kernel
+    # Original image
+    axes[0, 0].imshow(image, cmap='gray')
+    axes[0, 0].set_title('Original Image')
+    axes[0, 0].axis('off')
 
-    def _convolve_1d(self, image: np.ndarray, kernel: np.ndarray, axis: int) -> np.ndarray:
-        """Apply 1D convolution along specified axis."""
-        kernel_size = len(kernel)
-        pad = kernel_size // 2
+    # Blurred
+    axes[0, 1].imshow(blurred, cmap='gray')
+    axes[0, 1].set_title('Gaussian Blur (σ=1.5)')
+    axes[0, 1].axis('off')
 
-        if axis == 0:  # Vertical
-            padded = np.pad(image, ((pad, pad), (0, 0)), mode='edge')
-            result = np.zeros_like(image, dtype=np.float32)
-            for i in range(image.shape[0]):
-                for j in range(image.shape[1]):
-                    result[i, j] = np.sum(kernel * padded[i:i+kernel_size, j])
-        else:  # Horizontal
-            padded = np.pad(image, ((0, 0), (pad, pad)), mode='edge')
-            result = np.zeros_like(image, dtype=np.float32)
-            for i in range(image.shape[0]):
-                for j in range(image.shape[1]):
-                    result[i, j] = np.sum(kernel * padded[i, j:j+kernel_size])
+    # Sobel magnitude
+    axes[0, 2].imshow(magnitude_normalized, cmap='hot')
+    axes[0, 2].set_title('Sobel Edge Magnitude')
+    axes[0, 2].axis('off')
 
-        return result
+    # Non-maximum suppression
+    axes[1, 0].imshow(suppressed_normalized, cmap='hot')
+    axes[1, 0].set_title('Non-Maximum Suppression')
+    axes[1, 0].axis('off')
 
-    def threshold(self, image: np.ndarray = None, threshold_val: int = 127) -> np.ndarray:
-        """Binary thresholding."""
-        if image is None:
-            image = self.preprocessed if self.preprocessed is not None else self.grayscale
+    # Binary image
+    axes[1, 1].imshow(binary, cmap='gray')
+    axes[1, 1].set_title(f'Binary Image (threshold={threshold})')
+    axes[1, 1].axis('off')
 
-        return (image > threshold_val).astype(np.uint8) * 255
+    # Contours visualization
+    contour_img = np.zeros_like(binary)
+    for contour in filtered_contours:
+        for point in contour:
+            x, y = int(point[0]), int(point[1])
+            if 0 <= y < contour_img.shape[0] and 0 <= x < contour_img.shape[1]:
+                contour_img[y, x] = 255
 
-    def sobel_edge_detection(self, image: np.ndarray = None) -> np.ndarray:
-        """Detect edges using Sobel operator (implemented from scratch)."""
-        if image is None:
-            image = self.grayscale
+    axes[1, 2].imshow(contour_img, cmap='gray')
+    axes[1, 2].set_title(f'Extracted Contours ({len(filtered_contours)} found)')
+    axes[1, 2].axis('off')
 
-        # Sobel kernels
-        sobel_x = np.array([[-1, 0, 1],
-                            [-2, 0, 2],
-                            [-1, 0, 1]], dtype=np.float32)
+    plt.tight_layout()
 
-        sobel_y = np.array([[-1, -2, -1],
-                            [0, 0, 0],
-                            [1, 2, 1]], dtype=np.float32)
+    if output_dir:
+        output_path = f'{output_dir}/pipeline_visualization.png'
+        plt.savefig(output_path, dpi=150, bbox_inches='tight')
+        print(f'Saved visualization to: {output_path}')
+    else:
+        plt.savefig('pipeline_visualization.png', dpi=150, bbox_inches='tight')
+        print('Saved visualization to: pipeline_visualization.png')
 
-        # Apply convolution
-        gx = self._convolve_2d(image, sobel_x)
-        gy = self._convolve_2d(image, sobel_y)
+    plt.show()
 
-        # Magnitude
-        magnitude = np.sqrt(gx**2 + gy**2)
-        magnitude = (magnitude / magnitude.max() * 255).astype(np.uint8)
+    # Print statistics
+    print('\n=== Pipeline Statistics ===')
+    print(f'Original image size: {image.shape}')
+    print(f'Number of contours found: {len(contours)}')
+    print(f'Number of contours after filtering: {len(filtered_contours)}')
 
-        self.edges = magnitude
-        return magnitude
+    if filtered_contours:
+        sizes = [len(c) for c in filtered_contours]
+        print(f'Contour sizes - Min: {min(sizes)}, Max: {max(sizes)}, Mean: {np.mean(sizes):.1f}')
 
-    def _convolve_2d(self, image: np.ndarray, kernel: np.ndarray) -> np.ndarray:
-        """Apply 2D convolution."""
-        kernel_h, kernel_w = kernel.shape
-        pad_h, pad_w = kernel_h // 2, kernel_w // 2
+    # Visualize paths in turtle space
+    print('\n=== Planning paths in turtle space ===')
+    planner = PathPlanner(image.shape)
+    paths = planner.contours_to_paths(filtered_contours)
+    print(f'Number of paths: {len(paths)}')
 
-        padded = np.pad(image, ((pad_h, pad_h), (pad_w, pad_w)), mode='edge')
-        result = np.zeros_like(image, dtype=np.float32)
+    if paths:
+        fig, ax = plt.subplots(figsize=(10, 10))
+        ax.set_xlim(0, 11)
+        ax.set_ylim(0, 11)
+        ax.set_aspect('equal')
+        ax.set_title('Turtle Drawing Space')
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.grid(True, alpha=0.3)
 
-        for i in range(image.shape[0]):
-            for j in range(image.shape[1]):
-                region = padded[i:i+kernel_h, j:j+kernel_w]
-                result[i, j] = np.sum(region * kernel)
+        colors = plt.cm.rainbow(np.linspace(0, 1, len(paths)))
 
-        return result
+        for path_idx, path in enumerate(paths):
+            xs = [p[0] for p in path]
+            ys = [p[1] for p in path]
+            ax.plot(xs, ys, color=colors[path_idx], alpha=0.7, linewidth=2, label=f'Path {path_idx + 1}')
 
-    def preprocess(self, image: np.ndarray = None) -> np.ndarray:
-        """Complete preprocessing pipeline."""
-        if image is None:
-            image = self.grayscale
+        ax.scatter([5.5], [5.5], color='red', s=100, marker='o', label='Start position', zorder=5)
+        ax.legend()
 
-        # Apply Gaussian blur to reduce noise
-        blurred = self.gaussian_blur(image, kernel_size=5, sigma=1.5)
-
-        # Apply Sobel edge detection
-        edges = self.sobel_edge_detection(blurred)
-
-        # Threshold edges
-        self.preprocessed = self.threshold(edges, threshold_val=50)
-
-        return self.preprocessed
-
-    def extract_contours(self, edges: np.ndarray = None, min_length: int = 10) -> List[np.ndarray]:
-        """Extract contours using simple connected component labeling."""
-        if edges is None:
-            edges = self.preprocessed if self.preprocessed is not None else self.edges
-
-        # Make a copy to avoid modifying original
-        labeled = edges.copy()
-        contours_list = []
-
-        # Find all white pixels and trace contours
-        h, w = labeled.shape
-        visited = np.zeros_like(labeled, dtype=bool)
-
-        for y in range(h):
-            for x in range(w):
-                if labeled[y, x] > 0 and not visited[y, x]:
-                    # Trace this contour
-                    contour = self._trace_contour(labeled, visited, x, y)
-                    if len(contour) > min_length:
-                        contours_list.append(contour)
-
-        self.contours = contours_list
-        return contours_list
-
-    def _trace_contour(self, edges: np.ndarray, visited: np.ndarray, start_x: int, start_y: int) -> np.ndarray:
-        """Trace a single contour using flood fill."""
-        h, w = edges.shape
-        stack = [(start_x, start_y)]
-        contour_points = []
-
-        while stack:
-            x, y = stack.pop()
-
-            if x < 0 or x >= w or y < 0 or y >= h:
-                continue
-            if visited[y, x] or edges[y, x] == 0:
-                continue
-
-            visited[y, x] = True
-            contour_points.append([x, y])
-
-            # 8-connectivity: check all 8 neighbors
-            for dx in [-1, 0, 1]:
-                for dy in [-1, 0, 1]:
-                    if dx == 0 and dy == 0:
-                        continue
-                    nx, ny = x + dx, y + dy
-                    if 0 <= nx < w and 0 <= ny < h and not visited[ny, nx] and edges[ny, nx] > 0:
-                        stack.append((nx, ny))
-
-        return np.array(contour_points, dtype=np.int32)
-
-    def get_contour_skeleton(self, contour: np.ndarray, max_points: int = 100) -> np.ndarray:
-        """Downsample contour to manageable number of points."""
-        if len(contour) <= max_points:
-            return contour
-
-        # Simple uniform sampling
-        step = len(contour) // max_points
-        if step < 1:
-            step = 1
-        return contour[::step]
+        plt.tight_layout()
+        plt.savefig('turtle_paths.png', dpi=150, bbox_inches='tight')
+        print('Saved path visualization to: turtle_paths.png')
+        plt.show()
 
 
-class CoordinateMapper:
-    """Maps image coordinates to turtle coordinate space."""
+def main(args=None):
+    parser = argparse.ArgumentParser(description='Visualize computer vision pipeline')
+    parser.add_argument('image', nargs='?', help='Path to image file')
+    parser.add_argument('-o', '--output', help='Output directory for images')
+    args = parser.parse_args(args)
 
-    def __init__(self, image_shape: Tuple[int, int], turtle_bounds: Tuple[float, float, float, float]):
-        """
-        Initialize mapper.
-        turtle_bounds: (min_x, max_x, min_y, max_y) in turtle coordinate space
-        """
-        self.image_height, self.image_width = image_shape[:2]
-        self.turtle_min_x, self.turtle_max_x, self.turtle_min_y, self.turtle_max_y = turtle_bounds
+    if args.image is None:
+        print('Usage: vision_pipeline <image_path> [-o output_dir]')
+        return
 
-    def map_point(self, img_x: float, img_y: float) -> Tuple[float, float]:
-        """Map image coordinates to turtle coordinates."""
-        # Normalize to [0, 1]
-        norm_x = img_x / self.image_width
-        norm_y = img_y / self.image_height
+    visualize_pipeline(args.image, args.output)
 
-        # Map to turtle bounds
-        turtle_x = self.turtle_min_x + norm_x * (self.turtle_max_x - self.turtle_min_x)
-        turtle_y = self.turtle_max_y - norm_y * (self.turtle_max_y - self.turtle_min_y)  # Flip Y
 
-        return turtle_x, turtle_y
-
-    def map_contour(self, contour: np.ndarray) -> np.ndarray:
-        """Map all points in a contour."""
-        mapped = np.zeros_like(contour, dtype=np.float32)
-        for i, point in enumerate(contour):
-            mapped[i] = self.map_point(point[0], point[1])
-        return mapped
+if __name__ == '__main__':
+    main()

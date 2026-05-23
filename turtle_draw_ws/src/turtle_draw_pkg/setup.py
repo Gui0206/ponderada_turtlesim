@@ -1,27 +1,28 @@
-from setuptools import find_packages, setup
-
-package_name = 'turtle_draw_pkg'
+from setuptools import setup, find_packages
 
 setup(
-    name=package_name,
-    version='0.0.0',
-    packages=find_packages(exclude=['test']),
+    name='turtle_draw_pkg',
+    version='0.0.1',
+    packages=find_packages(),
     data_files=[
         ('share/ament_index/resource_index/packages',
-            ['resource/' + package_name]),
-        ('share/' + package_name, ['package.xml']),
+            ['resource/turtle_draw_pkg']),
+        ('share/turtle_draw_pkg', ['package.xml']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
+    author='Guilherme Hollanda',
+    author_email='guilherme.marques@sou.inteli.edu.br',
     maintainer='Guilherme Hollanda',
     maintainer_email='guilherme.marques@sou.inteli.edu.br',
-    description='Turtle drawing from image contours',
+    url='https://github.com/guilhermeholanda/turtle_draw',
+    description='Computer vision pipeline to draw image contours with ROS 2 turtlesim',
     license='Apache-2.0',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'turtle_drawer = turtle_draw_pkg.turtle_drawer:main',
-            'image_processor = turtle_draw_pkg.image_processor:main',
+            'vision_pipeline = turtle_draw_pkg.vision_pipeline:main',
         ],
     },
 )

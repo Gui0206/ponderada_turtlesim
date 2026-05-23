@@ -1,292 +1,199 @@
-# Turtle Draw: Robotic Drawing from Image Contours
+# Turtle Draw: Desenhando com Robô a partir de uma Imagem
 
-Complete computer vision pipeline and ROS 2 package for extracting image contours and controlling the turtlesim robot to draw them.
+Uma pipeline completa de visão computacional implementada do zero para extrair contornos de imagens e controlar a tartaruga do turtlesim para reproduzi-los.
 
-**Autora**: Guilherme Hollanda  
-**Disciplina**: Robótica e Visão Computacional - INTELI  
-**Data de Entrega**: 22/05/2026  
+## Vídeo Demonstração
 
-## 📋 Visão Geral
+[Inserir vídeo aqui (até 4 minutos)]
 
-Este projeto implementa uma pipeline completa de visão computacional **do zero**, usando apenas NumPy para operações matriciais. O sistema:
+## 📋 Requisitos
 
-1. **Carrega** uma imagem (dog.png)
-2. **Processa** a imagem (pré-processamento, detecção de bordas, extração de contornos)
-3. **Mapeia** os contornos para o espaço da tartaruga
-4. **Controla** o turtlesim via ROS 2 para desenhar os contornos
+- **ROS 2** (instalado via micromamba)
+- **Python 3.8+**
+- **NumPy** (para operações matriciais)
+- **OpenCV** (apenas para carregar imagens)
+- **Matplotlib** (para visualização)
 
-### 🎯 Requisitos Atendidos
+## 🚀 Setup e Execução
 
-- ✅ **Pré-processamento**: Conversão RGB→Cinza, Blur Gaussiano (do zero)
-- ✅ **Detecção de Bordas**: Operador Sobel com convolução 2D (do zero)
-- ✅ **Planejamento de Caminho**: Mapeamento coordenadas imagem → turtlesim
-- ✅ **Controle ROS 2**: Pacote completo com nó Python
-- ✅ **Documentação**: Relatório técnico e código comentado
-
-## 📁 Estrutura do Projeto
-
-```
-/ponderada_ros/
-├── README.md                           # Este arquivo
-├── dog.png                             # Imagem de entrada
-├── RELATORIO.md                        # Documentação técnica (máx 2 páginas)
-├── vision_pipeline_visualization.png   # Output da pipeline (gerado ao rodar)
-└── turtle_draw_ws/                     # ROS 2 Workspace
-    ├── build.sh                        # Script de build
-    ├── build.zsh                       # Build para zsh (testado)
-    ├── src/
-    │   └── turtle_draw_pkg/
-    │       ├── package.xml             # Metadados ROS 2
-    │       ├── setup.py                # Setup Python
-    │       ├── README.md               # Documentação do pacote
-    │       └── turtle_draw_pkg/
-    │           ├── __init__.py
-    │           ├── vision_pipeline.py  # Core vision (ImageProcessor, CoordinateMapper)
-    │           ├── turtle_drawer.py    # ROS 2 node principal
-    │           └── image_processor.py  # Utilitário de visualização
-    ├── build/                          # Compilado (gerado)
-    └── install/                        # Instalado (gerado)
-```
-
-## 🚀 Início Rápido
-
-### Pré-requisitos
-
-- ROS 2 (Humble ou superior) instalado via micromamba
-- Python 3.10+
-- A imagem `dog.png` no diretório do projeto
-
-### 1. Ativar Ambiente
+### 1. Ativar Ambiente ROS
 
 ```bash
 micromamba activate ros_env
 ```
 
-### 2. Navegar ao Workspace
+### 2. Compilar o Pacote ROS
 
 ```bash
 cd ~/Desktop/ponderada_ros/turtle_draw_ws
+colcon build
+source install/setup.bash
 ```
 
-### 3. Compilar (se necessário)
-
-```bash
-# Usando zsh (recomendado)
-zsh build.zsh
-
-# Ou manualmente
-source ~/.zshrc
-micromamba activate ros_env
-colcon build --symlink-install
-```
-
-### 4. Iniciar Turtlesim (Terminal 1)
+### 3. Iniciar turtlesim (em terminal separado)
 
 ```bash
 micromamba activate ros_env
 ros2 run turtlesim turtlesim_node
 ```
 
-### 5. Executar Turtle Drawer (Terminal 2)
+### 4. Executar a Pipeline
+
+#### Opção A: Visualizar Pipeline (recomendado primeiro)
+
+Visualiza cada etapa do processamento de imagem antes de desenhar:
 
 ```bash
-micromamba activate ros_env
-cd ~/Desktop/ponderada_ros/turtle_draw_ws
-source install/setup.bash
-ros2 run turtle_draw_pkg turtle_drawer
+ros2 run turtle_draw_pkg vision_pipeline /path/to/image.png
 ```
 
-**Resultado**: A tartaruga começará a desenhar os contornos da imagem do cão!
+Gera:
+- `pipeline_visualization.png` - Mostra: imagem original, blur, detecção de bordas, supressão não-máxima, imagem binária, contornos extraídos
+- `turtle_paths.png` - Mostra o espaço de desenho do turtle com os caminhos planejados
 
-## 📊 Pipeline de Visão Computacional
+#### Opção B: Desenhar com Turtle
 
-### Etapa 1: Pré-Processamento
-
-**Entrada**: Imagem BGR (dog.png)
-
-**Processamento**:
-1. Conversão para escala de cinza (fórmula de luminosidade: 0.299R + 0.587G + 0.114B)
-2. Blur Gaussiano (kernel 5×5, σ=1.5) com convolução separável
-3. Redução de ruído mantendo bordas significativas
-
-**Saída**: Imagem em escala de cinza suavizada
-
-### Etapa 2: Detecção de Bordas
-
-**Algoritmo**: Operador Sobel (implementado do zero)
-
-**Kernels**:
-```
-Sx = [-1  0  1]      Sy = [-1 -2 -1]
-     [-2  0  2]           [ 0  0  0]
-     [-1  0  1]           [ 1  2  1]
-```
-
-**Processamento**:
-1. Convolução 2D com Sx e Sy
-2. Cálculo de magnitude: M = √(Gx² + Gy²)
-3. Normalização: [0, 255]
-4. Thresholding: valores > 50 → bordas
-
-**Saída**: Mapa de bordas binário
-
-**Por que Sobel?**
-- Robusto a ruído
-- Detecta bordas multi-direcionais
-- Mais simples que Canny
-- Implementação clara
-
-### Etapa 3: Extração de Contornos
-
-**Algoritmo**: Flood Fill com 8-conectividade
-
-**Processamento**:
-1. Para cada pixel branco não visitado
-2. Rastrear contorno usando DFS (stack)
-3. Marcar pixels visitados
-4. Filtrar contornos pequenos (< 5 pixels)
-
-**Saída**: Lista de contornos [(x₁,y₁), (x₂,y₂), ...]
-
-### Etapa 4: Mapeamento de Coordenadas
-
-**Transformação**:
-- Espaço imagem: [0, width] × [0, height]
-- Espaço turtlesim: [0.5, 10.5] × [0.5, 10.5]
-
-**Fórmulas**:
-```
-norm_x = img_x / image_width
-norm_y = img_y / image_height
-turtle_x = 0.5 + norm_x * 10.0
-turtle_y = 10.5 - norm_y * 10.0  # Inverte Y
-```
-
-**Saída**: Contornos em coordenadas turtlesim
-
-## 🤖 Controle ROS 2
-
-### Nó: `turtle_drawer`
-
-**Publicador**:
-- Tópico: `/turtle1/cmd_vel`
-- Tipo: `geometry_msgs/Twist`
-- Campos: `twist.linear.x`, `twist.angular.z`
-
-**Parâmetros**:
-- Velocidade linear: 0.5 m/s
-- Velocidade angular: 0.5 rad/s
-- Threshold de movimento: 0.05 unidades
-
-**Fluxo**:
-1. Processa imagem
-2. Extrai contornos
-3. Para cada contorno:
-   - Move para primeiro ponto
-   - Desenha linha para cada ponto subsequente
-   - Pausa entre contornos
-
-## 🧪 Validação
-
-### Testes Realizados
-
-✅ Conversão RGB→Cinza com coeficientes corretos  
-✅ Blur Gaussiano preserva estrutura mantendo suavização  
-✅ Sobel detecta bordas em múltiplas direções  
-✅ Contours extraem formas corretamente  
-✅ Mapeamento preserva proporções  
-✅ ROS 2 publica comandos corretamente  
-
-### Visualizar Pipeline
+Processa a imagem e controla a tartaruga para desenhar os contornos:
 
 ```bash
-micromamba activate ros_env
-cd ~/Desktop/ponderada_ros/turtle_draw_ws
-source install/setup.bash
-ros2 run turtle_draw_pkg image_processor
+ros2 run turtle_draw_pkg turtle_drawer /path/to/image.png
 ```
 
-Gera `vision_pipeline_visualization.png` mostrando todas as etapas.
+## 📚 Arquitetura da Solução
 
-## 📝 Justificativas de Implementação
+### Módulos Implementados
 
-### Pré-Processamento
-- **Gaussian Blur separável**: O(n*k) vs O(n*k²), mantém qualidade
-- **σ=1.5**: Balanço entre suavização e preservação de bordas
+#### 1. **image_processor.py**
+Toda a pipeline de visão computacional do zero (sem OpenCV para processamento):
 
-### Detecção de Bordas
-- **Sobel vs. Canny**: Sobel é mais simples, suficiente para desenho robótico
-- **Threshold=50**: Remove ruído, mantém bordas significativas
+- **Gaussian Blur**: Implementação de convolução separável com kernel Gaussiano 1D
+- **Sobel Edge Detection**: Operadores Sobel X e Y para detecção de bordas
+- **Non-Maximum Suppression**: Supressão de não-máximos para afinamento de bordas (estilo Canny)
+- **Morphological Operations**: Dilatação e erosão para limpeza
+- **Thresholding**: Binarização de imagem
 
-### Contour Extraction
-- **Flood Fill vs. Moore-Neighbor**: Flood fill é robusto com 8-conectividade
-- **Downsampling**: Reduz pontos de ~10k para ~100-150 por contorno
+**Algoritmos chave:**
+- Convolução 2D com padding por reflexão
+- Cálculo de magnitude e direção do gradiente
+- Supressão baseada em direção de gradiente local
 
-### ROS 2
-- **Twist messages**: Padrão ROS para velocidade
-- **Linear+Angular**: Compatível com turtlesim
+#### 2. **contour_extractor.py**
+Extração de contornos a partir de imagens binárias:
 
-## 🔧 Dependências
+- **Moore-Neighbor Tracing**: Algoritmo de rastreamento de contornos
+- **Contour Filtering**: Remove contornos muito pequenos
+- **Ramer-Douglas-Peucker Simplification**: Reduz pontos mantendo forma
+- **Contour Merging**: Mescla contornos muito próximos
 
-**Permitidas** (conforme requisitos):
-- ✅ NumPy (operações matriciais)
-- ✅ OpenCV (carregamento de imagem apenas)
-- ✅ Matplotlib (visualização)
+#### 3. **path_planner.py**
+Planejamento de movimentos do turtle:
 
-**Não utilizadas** (como exigido):
-- ❌ scikit-image
-- ❌ scipy
-- ❌ PIL/Pillow (exceto OpenCV)
+- **Coordinate Transformation**: Converte coordenadas de imagem para espaço turtle
+- **Movement Planning**: Calcula sequência de rotação e movimento
+- **Path Smoothing**: Suavização por média móvel
+- **Path Decimation**: Reduz número de pontos para contornos muito longos
 
-## ⚠️ Limitações Conhecidas
+#### 4. **turtle_drawer.py**
+Nó ROS 2 que controla a tartaruga:
 
-1. **Imagens muito densas**: Podem gerar muitos contornos pequenos
-2. **Objetos finos**: < 3 pixels podem não ser detectados
-3. **Performance**: Convolução manual é lenta (~2-3s para processar)
-4. **Granularidade de movimento**: 0.05 unidades; pode deixar pequenos gaps
+- **Pose Subscriber**: Recebe posição atual do turtle
+- **Velocity Publisher**: Envia comandos de movimento
+- **Movement Controller**: Implementa controle proporcional para atingir posições alvo
+- **Timeout handling**: Previne travamento
+
+#### 5. **vision_pipeline.py**
+Ferramenta de visualização e debug:
+
+- Mostra resultado de cada etapa da pipeline
+- Gera gráficos informativos
+- Facilita ajuste de parâmetros
+
+## 🔧 Ajustes de Parâmetros
+
+No código, você pode ajustar:
+
+### image_processor.py
+```python
+# Em preprocess():
+gaussian_blur(..., kernel_size=5, sigma=1.5)  # Tamanho do blur
+threshold(normalized_mag, threshold_value=0.1)  # Sensibilidade de detecção
+```
+
+### contour_extractor.py
+```python
+# Em find_contours():
+if len(contour) > 5:  # Tamanho mínimo do contorno
+
+# Em simplify_contour():
+ContourExtractor.simplify_contour(contour, epsilon=3.0)  # Simplificação
+```
+
+### turtle_drawer.py
+```python
+self.linear_speed = 2.0  # Velocidade linear
+self.angular_speed = 1.0  # Velocidade angular
+self.position_tolerance = 0.05  # Tolerância de posição
+```
+
+## 📊 Exemplos de Uso
+
+### Com uma imagem simples (ex: linha, círculo)
+
+```bash
+# Criar imagem de teste
+python3 << 'EOF'
+import numpy as np
+from PIL import Image
+img = np.zeros((200, 200), dtype=np.uint8)
+img[50:150, 75:125] = 255  # Retângulo branco
+Image.fromarray(img).save('test_rect.png')
+EOF
+
+# Visualizar pipeline
+ros2 run turtle_draw_pkg vision_pipeline test_rect.png
+
+# Desenhar
+ros2 run turtle_draw_pkg turtle_drawer test_rect.png
+```
 
 ## 🐛 Troubleshooting
 
-**Nenhum contorno detectado**
-```bash
-# Aumentar threshold Sobel em vision_pipeline.py
-# threshold_val = 30  # ao invés de 50
-```
+### "Could not load image"
+- Verifique o caminho absoluto da imagem
+- Formatos suportados: PNG, JPG, BMP, etc (qualquer formato do OpenCV)
 
-**Tartaruga move erraticamente**
-```bash
-# Reduzir velocidade em turtle_drawer.py
-self.linear_speed = 0.3  # ao invés de 0.5
-```
+### Turtle não se move
+- Verifique se turtlesim está rodando: `ros2 topic list` deve mostrar `/turtle1/pose`
+- Verifique permissões: `ros2 topic pub /turtle1/cmd_vel geometry_msgs/msg/Twist '{linear: {x: 1.0}}'`
 
-**Build falha**
-```bash
-# Garantir que ROS 2 está ativo
-micromamba activate ros_env
-colcon build --symlink-install
-```
+### Contornos não são detectados
+- Ajuste o `threshold_value` em `image_processor.py`
+- Experimente diferentes valores de sigma para o Gaussian blur
+- Use `vision_pipeline` para debugar cada etapa
 
-## 📚 Referências
+### Performance lenta
+- Reduza o tamanho da imagem (redimensione antes de passar)
+- Use `path_planner.decimate_path()` para reduzir pontos
 
-- [ROS 2 Documentation](https://docs.ros.org/)
-- [Sobel Operator](https://en.wikipedia.org/wiki/Sobel_operator)
-- [Gaussian Blur](https://en.wikipedia.org/wiki/Gaussian_blur)
-- [Connected Components](https://en.wikipedia.org/wiki/Connected-component_labeling)
-- Digital Image Processing (Gonzalez & Woods)
+## 📝 Relatório Técnico
 
-## 📹 Entregáveis
+Veja [RELATORIO.md](RELATORIO.md) para documentação detalhada das decisões de implementação.
 
-- ✅ **Código**: Pacote ROS 2 completo em `turtle_draw_ws/`
-- ✅ **Relatório**: Documentação técnica em `RELATORIO.md` (< 2 páginas)
-- 📹 **Vídeo**: A ser gravado (screencast até 4 minutos)
-- 📊 **Repositório Git**: Todos os módulos com README
+## 📄 Licença
+
+Apache 2.0
 
 ## 👤 Autor
 
-**Guilherme Hollanda**  
-Email: guilherme.marques@sou.inteli.edu.br  
-INTELI - Instituto de Tecnologia e Liderança  
+Guilherme Hollanda  
+guilherme.marques@sou.inteli.edu.br
 
----
+## 🔗 Referências
 
-**Último atualizado**: 22/05/2026 às 23h00
+- ROS 2 Documentation: https://docs.ros.org/en/humble/
+- NumPy Documentation: https://numpy.org/doc/
+- Algoritmos implementados:
+  - Sobel edge detection
+  - Gaussian blur
+  - Moore-Neighbor contour tracing
+  - Ramer-Douglas-Peucker simplification

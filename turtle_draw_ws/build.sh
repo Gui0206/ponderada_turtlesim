@@ -1,21 +1,42 @@
 #!/bin/bash
-set -e
 
-# Activate ros_env
+# Build and setup Turtle Draw ROS 2 package
+
+echo "========================================="
+echo "Turtle Draw - Build Script"
+echo "========================================="
+
+# Activate ROS environment
+echo "Activating ROS environment..."
 eval "$(micromamba shell hook --shell bash)"
 micromamba activate ros_env
 
-# Source ROS setup
-# source /opt/ros/humble/setup.bash 2>/dev/null || true
-
-# Build
+# Navigate to workspace
 cd "$(dirname "$0")"
-echo "Building ROS 2 package..."
-colcon build --symlink-install
 
 echo ""
+echo "Building package..."
+colcon build
+
+echo ""
+echo "Sourcing install scripts..."
+source install/setup.bash
+
+echo ""
+echo "========================================="
 echo "Build complete!"
 echo ""
-echo "To use this package, run:"
+echo "To use in this terminal, run:"
 echo "  source install/setup.bash"
-echo "  ros2 run turtle_draw_pkg turtle_drawer"
+echo ""
+echo "Then start turtlesim (in another terminal):"
+echo "  ros2 run turtlesim turtlesim_node"
+echo ""
+echo "Test the vision pipeline:"
+echo "  cd src/turtle_draw_pkg"
+echo "  python3 create_test_image.py"
+echo "  ros2 run turtle_draw_pkg vision_pipeline test_shapes.png"
+echo ""
+echo "Or draw with the turtle:"
+echo "  ros2 run turtle_draw_pkg turtle_drawer test_shapes.png"
+echo "========================================="
