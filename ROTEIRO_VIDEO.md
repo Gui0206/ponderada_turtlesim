@@ -50,20 +50,15 @@
 
 ---
 
-### Parte C: Visualização dos Resultados (1:10 - 1:30)
+### Parte C: Resultados da Pipeline (1:10 - 1:30)
 
 **O que falar:**
-"Para debugar e visualizar cada etapa, implementei uma ferramenta que mostra o resultado de cada estágio. Vou executar para mostrar como funciona na prática."
+"Aqui estão os resultados de cada etapa do processamento. Você pode ver como a imagem original do cachorro passa por transformações até extrair apenas as bordas relevantes."
 
 **O que mostrar:**
-- Terminal rodando:
-  ```bash
-  ros2 run turtle_draw_pkg vision_pipeline ~/Desktop/ponderada_ros/dog.png
-  ```
-- Mostrar o output no terminal (pode fazer ahead of time e só mostrar)
-- Mostrar as imagens geradas:
-  - `pipeline_visualization.png` (6 estágios)
-  - `turtle_paths.png` (caminhos no espaço turtle)
+- Mostrar imagem estática: `dog.png` (imagem original)
+- Mostrar imagem estática: `pipeline_dog.png` (6 estágios de processamento)
+- Mostrar imagem estática: `paths_dog.png` (caminhos mapeados no espaço turtle)
 
 **Tempo: 20 segundos**
 
@@ -79,8 +74,8 @@
 - Mostrar função: `extract_points_from_binary_image()` (linhas ~45-80)
 - Highlight da transformação:
   ```python
-  turtle_x = margin + (x - min_x) * scale
-  turtle_y = margin + (max_y - y) * scale
+  turtle_x = margem + (x - min_x) * escala
+  turtle_y = margem + (max_y - y) * escala
   ```
 - Explicar: "A fórmula normaliza as coordenadas da imagem e as escala para caber no espaço do turtle"
 
@@ -113,22 +108,18 @@
 
 ---
 
-## 📹 Cena 5: Demonstração ao Vivo (3:10 - 3:50)
+## 📹 Cena 5: Demonstração do Resultado Final (3:10 - 3:50)
 
 **O que falar:**
-"Agora vou demonstrar o resultado final. A tartaruga vai desenhar o contorno do cão usando todos os algoritmos que implementei."
+"Este é o resultado final: a tartaruga desenhou com sucesso o contorno do cachorro usando todos os algoritmos que implementei. A imagem original foi processada, os contornos extraídos, mapeados para o espaço do Turtlesim, e a tartaruga reproduziu o desenho com precisão."
 
 **O que mostrar:**
-- **Terminal 1:** Turtlesim rodando (já deve estar aberto)
-- **Terminal 2:** Executar:
-  ```bash
-  ros2 run turtle_draw_pkg turtle_drawer ~/Desktop/ponderada_ros/dog.png
-  ```
-- Mostrar a tartaruga desenhando (deixa uns 30-40 segundos)
-- Se possível, fazer zoom no desenho ou mostrar a janela do turtlesim claramente
+- Mostrar imagem estática: `desenho_dog.png` (resultado final no turtlesim)
+- Pode fazer zoom ou mostrar em tela cheia
+- Apontar para os detalhes do desenho (cabeça, orelhas, corpo)
 
-**O que falar enquanto desenha:**
-"Como podem ver, a tartaruga está desenhando o contorno do cão. Ela extrai apenas os pixels das bordas, mapeia para o espaço do turtlesim, e usa teleportação para pular entre partes desconexas do desenho, sem desenhar linhas extras."
+**O que falar enquanto mostra a imagem:**
+"Como podem ver, a tartaruga extraiu apenas os pixels das bordas, mapeou para o espaço do Turtlesim, e usou teleportação para pular entre partes desconexas do desenho, sem desenhar linhas extras. O resultado é um desenho fiel ao contorno do cachorro."
 
 **Tempo: 40 segundos**
 
@@ -149,10 +140,12 @@
 
 ## 📋 Checklist para Gravação
 
-- [ ] Terminal pronto com turtlesim rodando em background
 - [ ] VS Code aberto com pasta do projeto
-- [ ] Imagens de teste (`dog.png`, `test_shapes.png`) disponíveis
-- [ ] Arquivos de visualização (`pipeline_visualization.png`, `turtle_paths.png`) já gerados ou prontos para gerar
+- [ ] Imagens prontas:
+  - [ ] dog.png (imagem original)
+  - [ ] pipeline_dog.png (6 estágios)
+  - [ ] paths_dog.png (caminhos turtle)
+  - [ ] desenho_dog.png (resultado final)
 - [ ] Microfone testado
 - [ ] OBS/software de gravação configurado
 - [ ] Resolução em 1080p ou superior
@@ -162,42 +155,40 @@
 
 ## 🎬 Dicas de Gravação
 
-1. **Gravação em partes:** Não precisa ser tudo ao vivo. Você pode gravar:
-   - Código (pausado)
-   - Terminal (rodando)
-   - Demonstração (ao vivo ou pré-gravada)
+1. **Estrutura simples:** Sem código em execução, apenas mostrar imagens e explicar o código visualmente
 
-2. **Edição simples:** Use DaVinci Resolve (gratuito) para:
-   - Juntar clips
-   - Adicionar transições
-   - Zoom em código importante
+2. **Edição recomendada:** Use DaVinci Resolve (gratuito) para:
+   - Juntar clips/imagens
+   - Adicionar transições suaves
+   - Zoom em código importante (quando mostrar telas de código)
    - Adicionar legendas com nomes de funções
+   - Inserir timestamps ou marcadores
 
 3. **Deixar claro:**
-   - Qual arquivo está abrindo (mostrar path)
+   - Qual arquivo está abrindo (mostrar path no título)
    - Qual função está mostrando (highlight visual)
-   - Qual é o output (mostrar terminal ou imagens)
+   - Qual é o resultado (mostrar imagens sequencialmente)
 
-4. **Timing:** Se ficar perto de 4 min, você pode:
-   - Cortar a demonstração (30 segundos é suficiente)
-   - Acelerar vídeo do turtle desenhando (2x speed)
-   - Pular a Cena 3 se ficou longo
+4. **Pacing:** Como não há execução ao vivo:
+   - Pode gravar tudo em estúdio com controle total
+   - Gravar código com zoom e destaques
+   - Gravar imagens com apresentação clara
+   - Deixar tempo suficiente para ler código
 
 ---
 
-## 📹 Exemplo de Estrutura de Pasta para Edição
+## 📹 Exemplo de Estrutura de Gravação
 
 ```
-Video_TurtleDraw/
-├── Cena1_Intro.mp4
-├── Cena2A_Visao_Geral.mp4
-├── Cena2B_Sobel.mp4
-├── Cena2C_Visualizacao.mp4
-├── Cena3_Mapeamento.mp4
-├── Cena4_ROS2.mp4
-├── Cena5_Demo.mp4
-├── Cena6_Conclusao.mp4
-└── Final_Video.mp4 (após edição)
+Gravações Necessárias:
+├── Intro.mp4 (0:00-0:20)
+├── CodeOverview.mp4 (0:20-0:35) - Mostrar image_processor.py
+├── SobelAlgorithm.mp4 (0:35-1:10) - Mostrar função Sobel
+├── ImageResults.mp4 (1:10-1:30) - Mostrar imagens estáticas
+├── Mapping.mp4 (1:30-2:20) - Mostrar turtle_drawer.py
+├── ROS2Control.mp4 (2:20-3:10) - Mostrar serviços ROS
+├── FinalResult.mp4 (3:10-3:50) - Mostrar desenho_dog.png
+└── Conclusion.mp4 (3:50-4:00) - Conclusão
 ```
 
 ---
@@ -209,12 +200,22 @@ Video_TurtleDraw/
 | 1 | Introdução | 0:20 |
 | 2A | Visão Geral | 0:15 |
 | 2B | Sobel Details | 0:35 |
-| 2C | Visualização | 0:20 |
+| 2C | Resultados Imagens | 0:20 |
 | 3 | Mapeamento | 0:50 |
 | 4 | ROS 2 Control | 0:50 |
-| 5 | Demo ao Vivo | 0:40 |
+| 5 | Resultado Final | 0:40 |
 | 6 | Conclusão | 0:10 |
 | **TOTAL** | | **~4:00** |
+
+---
+
+## 🎯 Fluxo Visual Recomendado
+
+1. **Código em VS Code** → Zoom nos pontos importantes
+2. **Imagens estáticas** → Apresentar sequencialmente
+3. **Explicação verbal** → Sincronizada com o visual
+
+Isso cria uma apresentação limpa, profissional e fácil de acompanhar.
 
 ---
 
